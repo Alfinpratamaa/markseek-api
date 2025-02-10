@@ -21,7 +21,6 @@
     "dotenvenc": "^3.0.2",
     "drizzle-orm": "^0.39.1",
     "elysia": "latest",
-    "google-auth-library": "^9.15.1",
     "googleapis": "^144.0.0",
     "install": "^0.13.0",
     "jsonwebtoken": "^9.0.2",
@@ -30,9 +29,7 @@
     "ts-node": "^10.9.2"
   },
   "devDependencies": {
-    "bun-types": "latest",
-    "drizzle-kit": "^0.30.4",
-    "env-encrypt": "^0.0.1"
+    "bun-types": "latest"
   },
   "module": "src/index.js"
 }
