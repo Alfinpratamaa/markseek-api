@@ -1,11 +1,8 @@
-import { eq } from "drizzle-orm";
-import { db } from "../db";
-import { users, verificationTokens } from "../db/schema";
+import prisma from "../db/db";
 import { comparePassword, hashPassword } from "../utils/bcyrpt";
 import crypto from "crypto";
-import { User } from "../types";
 import { sendVerificationEmail } from "../utils/mailer";
-import { createErrorResponse, createSuccessResponse } from "../libs/Response";
+import { createSuccessResponse } from "../libs/Response";
 import {
   GOOGLE_CALLBACK_URL,
   GOOGLE_CLIENT_ID,
@@ -17,77 +14,74 @@ import {
   REFRESH_TOKEN_EXPIRES_IN_MS,
 } from "../utils/constants";
 import { google } from "googleapis";
-import { redirect } from "elysia";
+import { error, redirect } from "elysia";
 
 export const register = async ({ body, error }: any) => {
   const { name, email, password } = body;
 
-  const [existingUser] = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, email));
+  const existingUser = await prisma.user.findFirst({
+    where: {
+      email,
+    },
+  });
   if (existingUser) return error(400, "Email sudah terdaftar");
 
   const hashedPassword = await hashPassword(password);
 
-  const [newUser] = (await db
-    .insert(users)
-    .values({
+  const newUser = await prisma.user.create({
+    data: {
       name,
       email,
       password: hashedPassword,
-    })
-    .returning()
-    .execute()) as User[];
+    },
+  });
 
   const token = crypto.randomBytes(32).toString("hex");
 
-  await db.insert(verificationTokens).values({
-    identifier: newUser.id,
-    token,
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
+  await prisma.verificationToken.create({
+    data: {
+      token,
+      identifier: newUser.id,
+      expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
+    },
   });
 
-  await sendVerificationEmail(email, token, "verify-email");
+  await sendVerificationEmail(email, token, "verify");
 
   return createSuccessResponse<void>("User created successfully", undefined);
 };
 
 export const login = async ({ body, accessJwt, refreshJwt, cookie }: any) => {
   const { email, password } = body;
-  const [user] = await db.select().from(users).where(eq(users.email, email));
+  const user = await prisma.user.findUnique({
+    where: {
+      email,
+    },
+  });
   if (!user)
-    return createErrorResponse(
-      "Email tidak terdaftar",
-      "404",
-      "error",
-      "User not found"
-    );
+    return error(404, "user tidak ditemukan, silahkan daftar terlebih dahulu");
 
   const isPasswordMatch = await comparePassword(password, user.password!);
-  if (!isPasswordMatch)
-    return createErrorResponse(
-      "Password salah",
-      "401",
-      "error",
-      "Unauthorized"
-    );
+  if (!isPasswordMatch) return error(401, "Email atau password salah");
 
   const isEmailVerified = !!user.emailVerified;
   if (!isEmailVerified)
-    return createErrorResponse(
-      "Email belum diverifikasi",
-      "401",
-      "error",
-      "Unauthorized"
-    );
+    return error(401, "Email belum diverifikasi, silahkan cek email anda");
 
   const rememberMe = body.rememberMe || false;
-  const accessToken = await accessJwt.sign({ id: user.id.toString(),email : user.email,role:user.role });
+  const accessToken = await accessJwt.sign({
+    id: user.id.toString(),
+    email: user.email,
+    role: user.role,
+  });
   let refreshToken = "";
 
   if (rememberMe) {
-    refreshToken = await refreshJwt.sign({ id: user.id.toString(),email : user.email,role:user.role });
+    refreshToken = await refreshJwt.sign({
+      id: user.id.toString(),
+      email: user.email,
+      role: user.role,
+    });
   }
 
   cookie.accessToken.set({
@@ -135,19 +129,40 @@ export const login = async ({ body, accessJwt, refreshJwt, cookie }: any) => {
 export const verifyEmail = async ({ query }: { query: { token: string } }) => {
   const { token } = query;
 
-  const [verificationToken] = await db
-    .select()
-    .from(verificationTokens)
-    .where(eq(verificationTokens.token, token));
+  const verificationToken = await prisma.verificationToken.findFirst({
+    where: {
+      token,
+    },
+  });
 
   if (!verificationToken || new Date(verificationToken.expires) < new Date()) {
-    return { status: 404, body: { message: "Token tidak valid" } };
+    return error(404, "Token tidak valid");
   }
 
-  await db
-    .update(users)
-    .set({ emailVerified: new Date() })
-    .where(eq(users.id, verificationToken.identifier));
+  const isVerified = await prisma.user.findFirst({
+    where: {
+      id: verificationToken.identifier,
+      emailVerified: {
+        not: null,
+      },
+    },
+  });
+
+  if (isVerified) {
+    setTimeout(() => {
+      redirect("/login", 302);
+    }, 5000);
+    return createSuccessResponse<void>("Email sudah diverifikasi", undefined);
+  }
+
+  await prisma.user.update({
+    where: {
+      id: verificationToken.identifier,
+    },
+    data: {
+      emailVerified: new Date(),
+    },
+  });
 
   return { status: 200, body: { message: "Email berhasil diverifikasi" } };
 };
@@ -191,22 +206,20 @@ export const googleAuthCallback = async ({
 
   const { data } = await oauth2.userinfo.get();
 
-  const [existingUser] = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, data.email!));
+  const existingUser = await prisma.user.findFirst({
+    where: {
+      email: data.email!,
+    },
+  });
 
   if (!existingUser) {
-    const [newUser] = (await db
-      .insert(users)
-      .values({
+    const newUser = await prisma.user.create({
+      data: {
         name: data.name!,
         email: data.email!,
         emailVerified: new Date(),
-        avatar: data.picture,
-      })
-      .returning()
-      .execute()) as User[];
+      },
+    });
 
     const accessToken = await accessJwt.sign({ sub: newUser.id.toString() });
     const refreshToken = await refreshJwt.sign({ sub: newUser.id.toString() });
@@ -227,20 +240,21 @@ export const googleAuthCallback = async ({
 
 export const requestForgotPassword = async ({ body }: any) => {
   const { email } = body;
-  const [user] = await db.select().from(users).where(eq(users.email, email));
+  const user = await prisma.user.findFirst({
+    where: {
+      email,
+    },
+  });
   if (!user)
-    return createErrorResponse(
-      "Email tidak terdaftar",
-      "404",
-      "error",
-      "User not found"
-    );
+    return error(404, "User tidak ditemukan, silahkan daftar terlebih dahulu");
 
   const token = crypto.randomBytes(32).toString("hex");
-  await db.insert(verificationTokens).values({
-    identifier: user.id,
-    token,
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
+  await prisma.verificationToken.create({
+    data: {
+      token,
+      identifier: user.id,
+      expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
+    },
   });
 
   await sendVerificationEmail(email, token, "reset-password");
@@ -251,28 +265,26 @@ export const resetPassword = async ({ body, query }: any) => {
   const { token } = query;
   const { password } = body;
 
-  const [verificationToken] = await db
-    .select()
-    .from(verificationTokens)
-    .where(eq(verificationTokens.token, token));
-
+  const verificationToken = await prisma.verificationToken.findFirst({
+    where: {
+      token,
+    },
+  });
   console.log("verify token : ", verificationToken);
 
   if (!verificationToken || new Date(verificationToken.expires) < new Date()) {
-    return createErrorResponse(
-      "Token tidak valid",
-      "404",
-      "error",
-      "Token not valid"
-    );
+    return error(404, "Token tidak valid");
   }
 
   const hashedPassword = await hashPassword(password);
 
-  await db
-    .update(users)
-    .set({ password: hashedPassword })
-    .where(eq(users.id, verificationToken.identifier));
-
+  await prisma.user.update({
+    where: {
+      id: verificationToken.identifier,
+    },
+    data: {
+      password: hashedPassword,
+    },
+  });
   return createSuccessResponse<void>("Password reset successfully", undefined);
 };

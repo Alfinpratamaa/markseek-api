@@ -6,7 +6,6 @@ import {
   register,
   requestForgotPassword,
   resetPassword,
-  verifyEmail,
 } from "../controllers/authController";
 import jwt from "@elysiajs/jwt";
 import { JWT_SECRET } from "../config/env";
@@ -34,6 +33,5 @@ export const authRouter = new Elysia()
   .post("/login", login)
   .get("/google", redirectToGoogleAuth)
   .get("/google/callback", googleAuthCallback)
-  .get("/verify", verifyEmail)
   .post("/forget-password", requestForgotPassword)
   .post("/reset-password", resetPassword);

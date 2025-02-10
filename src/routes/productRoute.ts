@@ -1,3 +1,4 @@
+import { jwt } from "@elysiajs/jwt";
 import Elysia from "elysia";
 import {
   createProduct,
@@ -5,7 +6,6 @@ import {
   getAllProducts,
   getProductById,
 } from "../controllers/productController";
-import jwt from "@elysiajs/jwt";
 import { JWT_SECRET } from "../config/env";
 import {
   ACCESS_TOKEN_EXPIRES_IN,

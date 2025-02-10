@@ -14,13 +14,13 @@ const transporter = nodemailer.createTransport({
 export const sendVerificationEmail = async (
   email: string,
   token: string,
-  title: "verify-email" | "reset-password"
+  title: "verify" | "reset-password"
 ) => {
   let link = "";
   let subject = "";
 
-  title === "verify-email"
-    ? ((link = `${APP_URL}/verify-email?token=${token}`),
+  title === "verify"
+    ? ((link = `${APP_URL}/verify?token=${token}`),
       (subject = "Verifikasi Email"))
     : ((link = `${APP_URL}/reset-password?token=${token}`),
       (subject = "Reset Password"));
@@ -88,7 +88,7 @@ export const sendVerificationEmail = async (
         <div class="email-body">
           <p>
           ${
-            title === "verify-email"
+            title === "verify"
               ? "Klik tombol di bawah ini untuk memverifikasi email kamu:"
               : "Klik tombol di bawah ini untuk mereset password kamu:"
           }

@@ -1,2 +1,0 @@
-ALTER TABLE "user" ADD COLUMN "products" json;--> statement-breakpoint
-ALTER TABLE "user" ADD CONSTRAINT "user_products_product_id_fk" FOREIGN KEY ("products") REFERENCES "public"."product"("id") ON DELETE no action ON UPDATE no action;

@@ -1,6 +1,7 @@
 interface SuccessResponse<T> {
   status: "success";
   message: string;
+  additional?: { string: any };
   data: T;
 }
 
@@ -16,11 +17,13 @@ interface ErrorResponse {
 
 function createSuccessResponse<T>(
   message: string,
-  data: T
+  data: T,
+  additional?: { string: any }
 ): SuccessResponse<T> {
   return {
     status: "success",
     message,
+    additional: additional ? { ...additional } : undefined,
     data,
   };
 }
