@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  name          String   @default("NO_NAME")
+  email         String   @unique
+  role          String   @default("user")
+  password      String?
+  emailVerified DateTime?
+  avatar        String?
+  address       Json?
+  products      Product[]
+  paymentMethod String?
+  createdAt     DateTime @default(now())
+  accounts      Account[]
+  sessions      Session[]
+  orders        Order[]
+  reviews       Review[]
+
+  Cart Cart[]
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String  @id
+  userId       String
+  expires      DateTime
+  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+  
+  @@id([identifier, token])
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String
+  createdAt DateTime @default(now())
+  products  Product[]
+}
+
+model Product {
+  id          String   @id @default(uuid()) 
+  name        String
+  slug        String   @unique
+  categoryId  String
+  images      String[]
+  brand       String
+  description String
+  stock       Int
+  price       Int
+  rating      Int      @default(0)
+  numReviews  Int      @default(0)
+  isFeatured  Boolean  @default(false)
+  banner      String?
+  userId      String
+  createdBy   User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  category    Category @relation(fields: [categoryId], references: [id])
+  reviews     Review[]
+  orderItems  OrderItem[]
+}
+
+model Review {
+  id                String   @id @default(uuid())
+  userId            String
+  productId         String
+  rating            Int
+  title             String
+  description       String
+  isVerifiedPurchase Boolean @default(true)
+  createdAt         DateTime @default(now())
+  user             User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product          Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Cart {
+  id            String  @id @default(uuid())
+  userId        String?
+  sessionCartId String
+  items         Json
+  itemsPrice    Decimal
+  shippingPrice Decimal
+  taxPrice      Decimal
+  totalPrice    Decimal
+  createdAt     DateTime @default(now())
+  user          User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id             String  @id @default(uuid())
+  userId         String
+  shippingAddress Json
+  paymentMethod  String
+  paymentResult  Json?
+  itemsPrice     Decimal
+  shippingPrice  Decimal
+  taxPrice       Decimal
+  totalPrice     Decimal
+  isPaid         Boolean @default(false)
+  paidAt         DateTime?
+  isDelivered    Boolean @default(false)
+  deliveredAt    DateTime?
+  createdAt      DateTime @default(now())
+  user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderItems    OrderItem[]
+}
+
+model OrderItem {
+  orderId   String
+  productId String
+  qty       Int
+  price     Decimal
+  name      String
+  slug      String
+  image     String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@id([orderId, productId])
+}

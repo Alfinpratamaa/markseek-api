@@ -1,6 +1,4 @@
-import { eq } from "drizzle-orm";
-import { db } from "../db";
-import { categories, products } from "../db/schema";
+import prisma from "../db/db";
 import { createSuccessResponse } from "../libs/Response";
 import { slugify } from "../utils/slug";
 
@@ -15,13 +13,18 @@ export interface CreateProductDTO {
 }
 
 export const getAllCategories = async () => {
-  const allCategories = await db.select().from(categories);
+  const allCategories = await prisma.category.findMany();
   return createSuccessResponse("All categories", allCategories);
 };
 
 export const getAllProducts = async () => {
-  const allProducts = await db.select().from(products);
-  return createSuccessResponse("All products", allProducts);
+  const allProducts = await prisma.product.findMany();
+  return {
+    status: "success",
+    length: allProducts.length,
+    message: "All products",
+    data: allProducts,
+  };
 };
 
 export const getProductById = async ({
@@ -30,7 +33,11 @@ export const getProductById = async ({
   params: { id: string };
 }) => {
   const { id } = params;
-  const product = await db.select().from(products).where(eq(products.id, id));
+  const product = await prisma.product.findFirst({
+    where: {
+      id: id,
+    },
+  });
   return createSuccessResponse("Product found", product);
 };
 
@@ -38,9 +45,10 @@ export const createProduct = async ({ body, headers, accessJwt }: any) => {
   const authHeader = headers.authorization;
   console.log("Auth Header : ", authHeader);
 
-  const token = authHeader?.startsWith("Bearer ")
+  const token = authHeader?.startsWith("bearer ")
     ? authHeader.slice(7)
     : undefined;
+  console.log("Token : ", token);
 
   const payload = await accessJwt.verify(token);
 
@@ -53,22 +61,19 @@ export const createProduct = async ({ body, headers, accessJwt }: any) => {
 
   const slug = slugify(name);
 
-  const newProduct = await db
-    .insert(products)
-    .values({
+  const newProduct = await prisma.product.create({
+    data: {
       name,
-      slug,
       categoryId,
-      images: JSON.stringify(images),
+      slug,
+      images: Array.isArray(images) ? images : [images],
       brand,
       description,
       stock,
       price,
-      isFeatured: false,
-      createdBy: payload.id, // Mengambil ID dari user yang terautentikasi
-      createdAt: new Date(),
-    })
-    .returning();
+      userId: payload.id!,
+    },
+  });
 
   return createSuccessResponse("Product created successfully", newProduct);
 };
