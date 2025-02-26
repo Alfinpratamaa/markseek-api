@@ -1,5 +1,6 @@
 const { execSync } = require("child_process");
 const os = require("os");
+const fs = require("fs");
 
 // Ambil key dari argumen CLI
 const args = process.argv.slice(2);
@@ -24,11 +25,19 @@ if (platform === "win32") {
 }
 
 try {
-  // Hapus file .env.enc sesuai OS
+  // Check if .env file exists
+  const envExists = fs.existsSync(".env");
+  const envEncExists = fs.existsSync(".env.enc");
+
+  if (!envExists && envEncExists) {
+    // Decrypt if .env does not exist but .env.enc exists
+    execSync(`dotenvenc -d ${key}`, { stdio: "inherit", shell: true });
+    console.log(".env file decrypted successfully.");
+  }
+  // deleteing first prev .env.enc file
   execSync(removeCommand, { stdio: "inherit", shell: true });
   console.log("File .env.enc dihapus.");
-
-  // Jalankan dotenvenc dengan key baru
+  // Re-encrypt with new key
   execSync(`dotenvenc -e ${key}`, { stdio: "inherit", shell: true });
   console.log("Re-encrypt berhasil dengan key baru.");
 } catch (error) {
