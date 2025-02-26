@@ -5,6 +5,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "bun run --watch src/main.ts",
     "encrypt": "bun run script/encrypt.mjs",
+    "decrypt": "bun run script/decrypt.mjs",
     "prisma:reset": "bunx prisma db push --force-reset && bunx prisma db seed && bun dev"
   },
   "prisma": {
