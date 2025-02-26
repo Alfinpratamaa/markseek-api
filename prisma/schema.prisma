@@ -8,12 +8,18 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+enum LoginType {
+  email
+  google
+}
+
 model User {
   id            String   @id @default(uuid())
   name          String   @default("NO_NAME")
   email         String   @unique
   role          String   @default("user")
   password      String?
+  loginType     String?   @default("email")
   emailVerified DateTime?
   avatar        String?
   address       Json?
@@ -81,7 +87,7 @@ model Product {
   rating      Int      @default(0)
   numReviews  Int      @default(0)
   isFeatured  Boolean  @default(false)
-  banner      String?
+  thumbnail      String?
   userId      String
   createdBy   User     @relation(fields: [userId], references: [id])
   createdAt   DateTime @default(now())

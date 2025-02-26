@@ -58,6 +58,11 @@ export const login = async ({ body, accessJwt, refreshJwt, cookie }: any) => {
       email,
     },
   });
+
+  if (user?.loginType === "google") {
+    return error(400, "Silahkan login menggunakan google");
+  }
+
   if (!user)
     return error(404, "user tidak ditemukan, silahkan daftar terlebih dahulu");
 
@@ -184,45 +189,59 @@ const authorizationUrl = Oauth2Client.generateAuthUrl({
   include_granted_scopes: true,
 });
 
-export const redirectToGoogleAuth = () => {
+export const redirectToGoogleAuth = async ({ cookie }: any) => {
+  if (cookie.accessToken.initial.value || cookie.refreshToken.initial.value) {
+    return redirect("/api/auth/protected", 302);
+  }
   return redirect(authorizationUrl, 302);
 };
 
 export const googleAuthCallback = async ({
-  body,
   accessJwt,
   refreshJwt,
   cookie,
   query,
 }: any) => {
-  const { code } = query;
-  const { tokens } = await Oauth2Client.getToken(code);
-  Oauth2Client.setCredentials(tokens);
+  if (cookie.accessToken.initial.value || cookie.refreshToken.initial.value) {
+    return redirect("/api/auth/protected", 302);
+  }
 
-  const oauth2 = google.oauth2({
-    auth: Oauth2Client,
-    version: "v2",
-  });
+  try {
+    if (!query.code || query.error === "access_denied") {
+      return redirect("/api/auth/google");
+    }
 
-  const { data } = await oauth2.userinfo.get();
+    const { tokens } = await Oauth2Client.getToken(query.code);
+    Oauth2Client.setCredentials(tokens);
+    console.log("code ", query.code);
 
-  const existingUser = await prisma.user.findFirst({
-    where: {
-      email: data.email!,
-    },
-  });
-
-  if (!existingUser) {
-    const newUser = await prisma.user.create({
-      data: {
-        name: data.name!,
-        email: data.email!,
-        emailVerified: new Date(),
-      },
+    const oauth2 = google.oauth2({
+      auth: Oauth2Client,
+      version: "v2",
     });
 
-    const accessToken = await accessJwt.sign({ sub: newUser.id.toString() });
-    const refreshToken = await refreshJwt.sign({ sub: newUser.id.toString() });
+    const { data } = await oauth2.userinfo.get();
+
+    let user = await prisma.user.findFirst({
+      where: { email: data.email! },
+    });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          name: data.name!,
+          email: data.email!,
+          loginType: "google",
+          avatar: data.picture! || "/default-avatar.png",
+          emailVerified: new Date(),
+        },
+      });
+    }
+
+    const accessToken = await accessJwt.sign({ id: user.id.toString() });
+    const refreshToken = await refreshJwt.sign({
+      id: user.id.toString(),
+    });
 
     cookie.accessToken.set({
       value: accessToken,
@@ -231,12 +250,78 @@ export const googleAuthCallback = async ({
       sameSite: "lax",
       maxAge: ACCESS_TOKEN_EXPIRES_IN_MS,
     });
-    return createSuccessResponse<any>("Login successful", {
-      accessToken,
-      refreshToken,
+    cookie.refreshToken.set({
+      value: refreshToken,
+      httpOnly: true,
+      secure: NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: REFRESH_TOKEN_EXPIRES_IN_MS,
     });
+
+    console.log("Cookie", cookie.accessToken.initial.value);
+
+    return redirect("/api/auth/protected", 302);
+  } catch (e: any) {
+    console.error("Google Auth Error:", e.message);
+    return error(400, { message: "Google Auth Error: " + e.message });
   }
 };
+
+export const logOut = async ({ cookie }: any) => {
+  cookie.accessToken.set({
+    value: "",
+    httpOnly: true,
+    secure: NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 0,
+  });
+
+  cookie.refreshToken.set({
+    value: "",
+    httpOnly: true,
+    secure: NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 0,
+  });
+  return redirect("/api/auth/google", 302);
+};
+
+export const protectedController = async ({
+  refreshJwt,
+  error,
+  cookie,
+}: any) => {
+  const cookieRefreshToken = cookie.refreshToken.initial.value;
+  const payload = await refreshJwt.verify(cookieRefreshToken);
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id: payload?.id,
+    },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      password: false,
+      avatar: true,
+      address: true,
+      emailVerified: true,
+      createdAt: true,
+    },
+  });
+
+  if (!user) return error(403, "User not authenticated");
+
+  return {
+    status: "success",
+    data: {
+      user,
+    },
+    code: 200,
+  };
+};
+
 
 export const requestForgotPassword = async ({ body }: any) => {
   const { email } = body;

@@ -2,6 +2,8 @@ import Elysia from "elysia";
 import {
   googleAuthCallback,
   login,
+  logOut,
+  protectedController,
   redirectToGoogleAuth,
   register,
   requestForgotPassword,
@@ -34,4 +36,6 @@ export const authRouter = new Elysia()
   .get("/google", redirectToGoogleAuth)
   .get("/google/callback", googleAuthCallback)
   .post("/forget-password", requestForgotPassword)
-  .post("/reset-password", resetPassword);
+  .post("/reset-password", resetPassword)
+  .get("/logout", logOut)
+  .get("/protected", protectedController);

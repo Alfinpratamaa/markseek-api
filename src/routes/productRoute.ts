@@ -1,10 +1,16 @@
+import {
+  deleteProduct,
+  getCategoryById,
+  getProductByslug,
+  updateProduct,
+} from "./../controllers/productController";
 import { jwt } from "@elysiajs/jwt";
 import Elysia from "elysia";
 import {
+  createCategory,
   createProduct,
   getAllCategories,
   getAllProducts,
-  getProductById,
 } from "../controllers/productController";
 import { JWT_SECRET } from "../config/env";
 import {
@@ -28,6 +34,10 @@ export const productRouter = new Elysia()
     })
   )
   .get("/categories", getAllCategories)
+  .get("/category/:slug", getCategoryById)
+  .post("/categories", createCategory)
   .get("/products", getAllProducts)
-  .get("/product/:id", getProductById)
-  .post("/products", createProduct);
+  .get("/product/:slug", getProductByslug)
+  .post("/products", createProduct)
+  .put("/product/:id", updateProduct)
+  .delete("/product/:id", deleteProduct);
