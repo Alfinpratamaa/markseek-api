@@ -82,6 +82,7 @@ model Product {
   images      String[]
   brand       String
   description String
+  isFLashSale Boolean  @default(false)
   stock       Int
   price       Int
   rating      Int      @default(0)

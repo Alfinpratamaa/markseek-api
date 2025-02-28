@@ -186,7 +186,7 @@ const brands = [
 async function main() {
   // await addUserAdmin();
   // await addCategories();
-  // await addProducts();
+  await addProducts();
   await prisma.$disconnect(); // Pastikan koneksi ditutup setelah selesai
 }
 
@@ -213,7 +213,7 @@ async function addProducts() {
       thumbnail: product.image,
       slug: product.title.toLowerCase().replace(/ /g, "-"),
       description: product.description,
-      userId: "8e5349fb-c784-4e2c-994c-69ca75558b33",
+      userId: "a366b03c-b863-4784-b8e8-23e2666fba2e",
       images: [product.image],
       categoryId: categories.find(
         (category) => category.name === product.category

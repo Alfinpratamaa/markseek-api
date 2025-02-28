@@ -76,7 +76,31 @@ export const createCategory = async ({ body }: { body: { name: string } }) => {
   return createSuccessResponse("Category created successfully", newCategory);
 };
 
-export const getAllProducts = async () => {
+export const getAllProducts = async ({ query }: any) => {
+  const { fs } = query;
+  if (fs === "true") {
+    const flashSaleProduct = await prisma.product.findMany({
+      where: {
+        isFLashSale: true,
+      },
+    });
+    return {
+      length: flashSaleProduct.length,
+      message: "All flash sale products",
+      data: flashSaleProduct || [],
+    };
+  } else if (fs === "false") {
+    const flashSaleProduct = await prisma.product.findMany({
+      where: {
+        isFLashSale: false,
+      },
+    });
+    return {
+      length: flashSaleProduct.length,
+      message: "All not flash sale products",
+      data: flashSaleProduct || [],
+    };
+  }
   const allProducts = await prisma.product.findMany();
 
   return {
