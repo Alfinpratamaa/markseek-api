@@ -54,8 +54,12 @@ export const getCategoryById = async ({
   };
 };
 
-export const createCategory = async ({ body }: { body: { name: string } }) => {
-  const { name } = body;
+export const createCategory = async ({
+  body,
+}: {
+  body: { name: string; image: string };
+}) => {
+  const { name, image } = body;
 
   const slug = slugify(name);
 
@@ -71,6 +75,7 @@ export const createCategory = async ({ body }: { body: { name: string } }) => {
     data: {
       name,
       slug,
+      image,
     },
   });
   return createSuccessResponse("Category created successfully", newCategory);
